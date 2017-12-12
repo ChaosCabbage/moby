@@ -785,7 +785,7 @@ func TarWithOptions(srcPath string, options *TarOptions) (io.ReadCloser, error) 
 				}
 
 				if skip {
-					// If we want to skip this file and its a directory
+					// If we want to skip this file and it's a directory
 					// then we should first check to see if there's an
 					// excludes pattern (e.g. !dir/file) that starts with this
 					// dir. If so then we can't skip this dir.
@@ -801,13 +801,55 @@ func TarWithOptions(srcPath string, options *TarOptions) (io.ReadCloser, error) 
 					}
 
 					dirSlash := relFilePath + string(filepath.Separator)
+					splitDir := strings.Split(relFilePath, filepath.Separator)
 
 					for _, pat := range pm.Patterns() {
 						if !pat.Exclusion() {
 							continue
 						}
-						if strings.HasPrefix(pat.String()+string(filepath.Separator), dirSlash) {
-							// found a match - so can't skip this dir
+
+						// Split the exclusion rule by directory,
+						// and work through it to see if this directory needs ot be kept.
+
+						// e.g.
+						//
+						// Keep the dir:
+						//     dir = "a/b/"
+						//     pat = "a/b/c.txt"
+						//
+						// Ignore the dir:
+						//     dir = "a/b/"
+						//     pat = "a/x/c.txt"
+						//
+						// Keep the dir:
+						//     dir = "a/b/"
+						//     pat = "a/**/c.txt"
+						//
+						// Ignore the dir:
+						//     dir = "x/"
+						//     pat = "a/**/c.txt"
+						//
+
+						splitPat := strings.Split(pat.String(), filepath.Separator)
+
+						matchedAll := true
+						for i, dir := range splitDir {
+							if pat[i] == "**" {
+								// We are now matching anything, so keep the dir
+								return nil
+							}
+							matched, err := filepath.Match(pat[i], dir)
+							if err != nil {
+								logrus.Errorf("Error matching %s to %s: %v", pat[i], dir, err)
+								return err
+							}
+							if !matched {
+								matchedAll = false
+								break
+							}
+						}
+
+						if matchedAll {
 							return nil
 						}
 					}
