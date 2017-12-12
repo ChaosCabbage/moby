@@ -800,16 +800,15 @@ func TarWithOptions(srcPath string, options *TarOptions) (io.ReadCloser, error) 
 						return filepath.SkipDir
 					}
 
-					dirSlash := relFilePath + string(filepath.Separator)
-					splitDir := strings.Split(relFilePath, filepath.Separator)
+					splitDir := strings.Split(relFilePath, string(filepath.Separator))
 
 					for _, pat := range pm.Patterns() {
 						if !pat.Exclusion() {
 							continue
 						}
 
-						// Split the exclusion rule by directory,
-						// and work through it to see if this directory needs ot be kept.
+						// To support patterns (e.g. /a/b?/**/c), split the exclusion rule by directory,
+						// and work through it to see if this directory needs to be kept.
 
 						// e.g.
 						//
@@ -830,17 +829,17 @@ func TarWithOptions(srcPath string, options *TarOptions) (io.ReadCloser, error) 
 						//     pat = "a/**/c.txt"
 						//
 
-						splitPat := strings.Split(pat.String(), filepath.Separator)
+						splitPat := strings.Split(pat.String(), string(filepath.Separator))
 
 						matchedAll := true
 						for i, dir := range splitDir {
-							if pat[i] == "**" {
+							if splitPat[i] == "**" {
 								// We are now matching anything, so keep the dir
 								return nil
 							}
-							matched, err := filepath.Match(pat[i], dir)
+							matched, err := filepath.Match(splitPat[i], dir)
 							if err != nil {
-								logrus.Errorf("Error matching %s to %s: %v", pat[i], dir, err)
+								logrus.Errorf("Error matching %s to %s: %v", splitPat[i], dir, err)
 								return err
 							}
 							if !matched {
